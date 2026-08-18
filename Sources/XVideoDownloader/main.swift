@@ -18,7 +18,7 @@ struct XVideoDownloaderApp: App {
 struct ContentView: View {
     @State private var urlText = ""
     @State private var isDownloading = false
-    @State private var status = "粘贴 x.com 视频地址，然后开始下载。"
+    @State private var status = "粘贴 X 或抖音视频地址，然后开始下载。"
     @State private var output = ""
 
     var body: some View {
@@ -28,14 +28,14 @@ struct ContentView: View {
                     .font(.system(size: 38))
                     .foregroundStyle(.blue)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("X 视频下载")
+                    Text("X / 抖音视频下载")
                         .font(.title2.bold())
                     Text("视频会保存到你的 Downloads 文件夹")
                         .foregroundStyle(.secondary)
                 }
             }
 
-            TextField("https://x.com/…/status/…", text: $urlText)
+            TextField("粘贴 x.com 或 douyin.com 视频链接", text: $urlText)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.body, design: .monospaced))
                 .onSubmit { startDownload() }
@@ -53,7 +53,7 @@ struct ContentView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isDownloading || !isValidXURL)
+                .disabled(isDownloading || normalizedURL == nil)
                 .keyboardShortcut(.return, modifiers: .command)
             }
 
@@ -64,7 +64,7 @@ struct ContentView: View {
                 .foregroundStyle(status.hasPrefix("下载完成") ? .green : .primary)
 
             ScrollView {
-                Text(output.isEmpty ? "提示：需要登录的视频会使用 Chrome 中的 X 登录状态。" : output)
+                Text(output.isEmpty ? "支持 X 和抖音分享链接；需要登录时会尝试使用 Chrome Cookie。" : output)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -75,15 +75,20 @@ struct ContentView: View {
         .padding(24)
     }
 
-    private var isValidXURL: Bool {
-        guard let url = URL(string: urlText.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let host = url.host?.lowercased() else { return false }
-        return host == "x.com" || host.hasSuffix(".x.com") || host == "twitter.com" || host.hasSuffix(".twitter.com")
+    private var normalizedURL: URL? {
+        let input = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let range = NSRange(input.startIndex..<input.endIndex, in: input)
+        let detected = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+            .firstMatch(in: input, range: range)?.url
+        guard let url = detected ?? URL(string: input),
+              let host = url.host?.lowercased() else { return nil }
+        let isX = host == "x.com" || host.hasSuffix(".x.com") || host == "twitter.com" || host.hasSuffix(".twitter.com")
+        let isDouyin = host == "douyin.com" || host.hasSuffix(".douyin.com")
+        return (isX || isDouyin) ? url : nil
     }
 
     private func startDownload() {
-        guard isValidXURL, !isDownloading else { return }
-        let input = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let input = normalizedURL?.absoluteString, !isDownloading else { return }
         isDownloading = true
         status = "正在下载…"
         output = ""

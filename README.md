@@ -1,6 +1,6 @@
-# X 视频下载（macOS）
+# X / 抖音视频下载（macOS）
 
-一个极简的原生 macOS 小程序：粘贴 x.com / twitter.com 视频地址，保存到系统 Downloads 文件夹。
+一个极简的原生 macOS 小程序：粘贴 x.com、twitter.com 或 douyin.com 视频地址，保存到系统 Downloads 文件夹。抖音分享文案中夹带的短链接也可直接粘贴。
 
 ## 使用
 
