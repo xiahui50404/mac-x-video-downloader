@@ -2,7 +2,7 @@
 
 @interface AppDelegate : NSObject <NSApplicationDelegate>
 @property NSWindow *window;
-@property NSTextField *urlField;
+@property NSTextView *urlField;
 @property NSButton *downloadButton;
 @property NSTextField *statusLabel;
 @property NSTextView *logView;
@@ -15,8 +15,8 @@
 
     NSMenuItem *appMenuItem = [NSMenuItem new];
     [mainMenu addItem:appMenuItem];
-    NSMenu *appMenu = [[NSMenu alloc] initWithTitle:@"X 视频下载"];
-    [appMenu addItemWithTitle:@"退出 X 视频下载" action:@selector(terminate:) keyEquivalent:@"q"];
+    NSMenu *appMenu = [[NSMenu alloc] initWithTitle:@"X / 抖音视频下载"];
+    [appMenu addItemWithTitle:@"退出 X / 抖音视频下载" action:@selector(terminate:) keyEquivalent:@"q"];
     appMenuItem.submenu = appMenu;
 
     NSMenuItem *editMenuItem = [NSMenuItem new];
@@ -33,50 +33,55 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     [self setupMenus];
-    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 560, 350)
+    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 560, 430)
                                                styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
                                                  backing:NSBackingStoreBuffered defer:NO];
-    self.window.title = @"X 视频下载";
+    self.window.title = @"X / 抖音视频下载";
     [self.window center];
 
     NSView *view = self.window.contentView;
-    NSTextField *title = [NSTextField labelWithString:@"X 视频下载"];
+    NSTextField *title = [NSTextField labelWithString:@"X / 抖音视频下载"];
     title.font = [NSFont boldSystemFontOfSize:24];
-    title.frame = NSMakeRect(24, 295, 500, 32);
+    title.frame = NSMakeRect(24, 375, 500, 32);
     [view addSubview:title];
 
-    NSTextField *subtitle = [NSTextField labelWithString:@"粘贴视频地址，文件会保存到你的 Downloads 文件夹"];
+    NSTextField *subtitle = [NSTextField labelWithString:@"在下方粘贴视频链接或完整分享文案，文件会保存到 Downloads"];
     subtitle.textColor = NSColor.secondaryLabelColor;
-    subtitle.frame = NSMakeRect(24, 270, 500, 20);
+    subtitle.frame = NSMakeRect(24, 350, 500, 20);
     [view addSubview:subtitle];
 
-    self.urlField = [[NSTextField alloc] initWithFrame:NSMakeRect(24, 222, 512, 32)];
-    self.urlField.placeholderString = @"https://x.com/…/status/…";
+    NSScrollView *urlScroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(24, 248, 512, 82)];
+    urlScroll.hasVerticalScroller = YES;
+    urlScroll.borderType = NSBezelBorder;
+    self.urlField = [[NSTextView alloc] initWithFrame:urlScroll.bounds];
     self.urlField.font = [NSFont monospacedSystemFontOfSize:13 weight:NSFontWeightRegular];
-    [view addSubview:self.urlField];
+    self.urlField.textContainerInset = NSMakeSize(6, 6);
+    self.urlField.automaticLinkDetectionEnabled = YES;
+    urlScroll.documentView = self.urlField;
+    [view addSubview:urlScroll];
 
     NSButton *openButton = [NSButton buttonWithTitle:@"打开 Downloads" target:self action:@selector(openDownloads:)];
-    openButton.frame = NSMakeRect(24, 174, 140, 30);
+    openButton.frame = NSMakeRect(24, 198, 140, 30);
     [view addSubview:openButton];
 
     self.downloadButton = [NSButton buttonWithTitle:@"下载视频" target:self action:@selector(download:)];
     self.downloadButton.bezelStyle = NSBezelStyleRounded;
     self.downloadButton.keyEquivalent = @"\r";
-    self.downloadButton.frame = NSMakeRect(414, 174, 122, 30);
+    self.downloadButton.frame = NSMakeRect(414, 198, 122, 30);
     [view addSubview:self.downloadButton];
 
     self.statusLabel = [NSTextField labelWithString:@"准备就绪"];
     self.statusLabel.font = [NSFont boldSystemFontOfSize:13];
-    self.statusLabel.frame = NSMakeRect(24, 138, 512, 20);
+    self.statusLabel.frame = NSMakeRect(24, 162, 512, 20);
     [view addSubview:self.statusLabel];
 
-    NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(24, 24, 512, 100)];
+    NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(24, 24, 512, 122)];
     scroll.hasVerticalScroller = YES;
     scroll.borderType = NSBezelBorder;
     self.logView = [[NSTextView alloc] initWithFrame:scroll.bounds];
     self.logView.editable = NO;
     self.logView.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular];
-    self.logView.string = @"需要登录的视频会使用 Chrome 中的 X 登录状态。";
+    self.logView.string = @"支持 X 和抖音分享链接；需要登录时会尝试使用 Chrome Cookie。";
     scroll.documentView = self.logView;
     [view addSubview:scroll];
 
@@ -92,17 +97,22 @@
 }
 
 - (void)download:(id)sender {
-    NSString *url = [self.urlField.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    NSString *input = [self.urlField.string stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    NSDataDetector *detector = [NSDataDetector dataDetectorWithTypes:NSTextCheckingTypeLink error:nil];
+    NSTextCheckingResult *match = [detector firstMatchInString:input options:0 range:NSMakeRange(0, input.length)];
+    NSString *url = match.URL.absoluteString ?: input;
     NSURL *parsed = [NSURL URLWithString:url];
     NSString *host = parsed.host.lowercaseString;
-    if (!([host isEqualToString:@"x.com"] || [host hasSuffix:@".x.com"] || [host isEqualToString:@"twitter.com"] || [host hasSuffix:@".twitter.com"])) {
-        self.statusLabel.stringValue = @"请输入有效的 x.com 视频帖子地址。";
+    BOOL isX = [host isEqualToString:@"x.com"] || [host hasSuffix:@".x.com"] || [host isEqualToString:@"twitter.com"] || [host hasSuffix:@".twitter.com"];
+    BOOL isDouyin = [host isEqualToString:@"douyin.com"] || [host hasSuffix:@".douyin.com"];
+    if (!(isX || isDouyin)) {
+        self.statusLabel.stringValue = @"请输入有效的 X 或抖音视频地址。";
         return;
     }
 
     self.downloadButton.enabled = NO;
     self.statusLabel.stringValue = @"正在下载…";
-    self.logView.string = @"正在连接 x.com…";
+    self.logView.string = isDouyin ? @"正在连接抖音…" : @"正在连接 x.com…";
 
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         @autoreleasepool {
